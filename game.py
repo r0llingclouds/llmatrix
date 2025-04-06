@@ -58,7 +58,7 @@ class Game:
                 "choices": [
                     {"text": "Tell me about this place", "next": "about_place"},
                     {"text": "I need information", "next": "information"},
-                    {"text": "Goodbye", "next": None}
+                    {"text": "Goodbye", "next": None} # this one seems to work ok
                 ]
             },
             "about_place": {
@@ -70,7 +70,7 @@ class Game:
                 "choices": [
                     {"text": "Local rumors", "next": "rumors"},
                     {"text": "The nearby dungeon", "next": "dungeon"},
-                    {"text": "Never mind", "next": "default"}
+                    {"text": "Never mind", "next": None}
                 ]
             },
             "rumors": {
@@ -206,11 +206,23 @@ class Game:
                             self.interacting_with = None
                         else:
                             self.dialogue_system.next_message()
-                            if not self.dialogue_system.active:
+                            # If dialogue is closed automatically due to reaching the end
+                            if not self.dialogue_system.active and isinstance(self.interacting_with, StaticNPC):
+                                # Check if there's a next state to transition to
+                                messages, has_choices, choices = self.interacting_with.advance_dialogue()
+                                if messages:
+                                    self.dialogue_system.show_dialogue_with_choices(
+                                        messages, 
+                                        choices if has_choices else None,
+                                        self.interacting_with.name,
+                                        self.interacting_with.sprite
+                                    )
+                                else:
+                                    self.interacting_with.reset_dialogue()
+                                    self.interacting_with = None
+                            elif not self.dialogue_system.active:
                                 if self.interacting_with and isinstance(self.interacting_with, AINPC):
                                     self.interacting_with.reset_conversation()
-                                elif isinstance(self.interacting_with, StaticNPC):
-                                    self.interacting_with.reset_dialogue()
                                 self.interacting_with = None
                     else:
                         self.state = "PAUSED"
@@ -235,6 +247,7 @@ class Game:
                                 else:
                                     # End dialogue if no more messages
                                     self.dialogue_system.close()
+                                    self.interacting_with.reset_dialogue()
                                     self.interacting_with = None
                         # For response mode dialogues, start input mode instead of advancing
                         elif self.dialogue_system.response_mode:
@@ -242,7 +255,21 @@ class Game:
                         # For regular dialogues, advance to next message
                         else:
                             self.dialogue_system.next_message()
-                            if not self.dialogue_system.active:
+                            # Check if dialogue closed automatically due to end of messages
+                            if not self.dialogue_system.active and isinstance(self.interacting_with, StaticNPC):
+                                # Check if there's a next state to transition to
+                                messages, has_choices, choices = self.interacting_with.advance_dialogue()
+                                if messages:
+                                    self.dialogue_system.show_dialogue_with_choices(
+                                        messages, 
+                                        choices if has_choices else None,
+                                        self.interacting_with.name,
+                                        self.interacting_with.sprite
+                                    )
+                                else:
+                                    self.interacting_with.reset_dialogue()
+                                    self.interacting_with = None
+                            elif not self.dialogue_system.active:
                                 if self.interacting_with and isinstance(self.interacting_with, AINPC):
                                     self.interacting_with.reset_conversation()
                                 self.interacting_with = None
