@@ -94,3 +94,10 @@ class AINPC(Entity):
         if not self.memory_enabled:
             self.conversation_history = self.initial_history.copy()
         return f"Memory {'enabled' if self.memory_enabled else 'disabled'}"
+
+class ShopNPC(Entity):
+    def __init__(self, x: int, y: int, color: Tuple[int, int, int]):
+        super().__init__(x, y, NPC_SIZE, NPC_SIZE, color)
+
+    def interact(self) -> str:
+        return "shop"
