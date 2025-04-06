@@ -114,6 +114,8 @@ class StaticNPC(Entity):
         self.ai_dialogue_instance = None
         self.previous_dialogue_key = None
         self.client = None
+        self.ai_conversation_memory = {}  # Store conversation histories for different dialogue branches
+        self.memory_enabled = True
     
     def set_openai_client(self, client):
         """Set the OpenAI client for AI dialogues"""
@@ -147,7 +149,12 @@ class StaticNPC(Entity):
                 # Check if this choice activates AI dialogue
                 if choice.get("type") == "ai_dialogue":
                     if self.client:
-                        initial_response = self.start_ai_dialogue(choice.get("system_prompt", f"You are {self.name}, a character in a game."))
+                        # Generate a memory key for this conversation branch
+                        memory_key = f"{self.current_dialogue_key}_{choice_index}"
+                        initial_response = self.start_ai_dialogue(
+                            choice.get("system_prompt", f"You are {self.name}, a character in a game."),
+                            memory_key
+                        )
                         return [initial_response], False, []
                     else:
                         # Fall back if no AI client available
@@ -178,19 +185,30 @@ class StaticNPC(Entity):
         choices = current.get("choices", [])
         return messages, has_choices, choices
     
-    def start_ai_dialogue(self, system_prompt: str):
+    def start_ai_dialogue(self, system_prompt: str, memory_key: str = "default"):
         """Start AI dialogue mode"""
         self.dialogue_mode = "ai"
         self.previous_dialogue_key = self.current_dialogue_key
         
-        # Create temporary AI dialogue handler
-        self.ai_dialogue_instance = {
-            "history": [
-                {"role": "system", "content": system_prompt},
-                {"role": "assistant", "content": "How can I help you?"}
-            ],
-            "memory_enabled": True
-        }
+        # Check if we have existing conversation memory for this branch
+        if self.memory_enabled and memory_key in self.ai_conversation_memory:
+            # Resume existing conversation
+            self.ai_dialogue_instance = self.ai_conversation_memory[memory_key]
+            # Add a transition message
+            if len(self.ai_dialogue_instance["history"]) > 2:  # If there was a previous conversation
+                self.ai_dialogue_instance["history"].append(
+                    {"role": "system", "content": "The player has returned to continue the conversation."}
+                )
+        else:
+            # Create new AI dialogue handler
+            self.ai_dialogue_instance = {
+                "history": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "assistant", "content": "How can I help you?"}
+                ],
+                "memory_enabled": self.memory_enabled,
+                "memory_key": memory_key
+            }
         
         # Return initial response for display
         return self.ai_dialogue_instance["history"][1]["content"]
@@ -205,6 +223,12 @@ class StaticNPC(Entity):
             response = "Goodbye then! Let me know if you need anything else."
             self.end_ai_dialogue()
             return response
+        
+        # Check for memory toggle command
+        if player_input.lower() == "toggle memory":
+            self.memory_enabled = not self.memory_enabled
+            self.ai_dialogue_instance["memory_enabled"] = self.memory_enabled
+            return f"Memory {'enabled' if self.memory_enabled else 'disabled'} for our conversations."
         
         # Add user input to history
         self.ai_dialogue_instance["history"].append({"role": "user", "content": player_input})
@@ -230,9 +254,13 @@ class StaticNPC(Entity):
     
     def end_ai_dialogue(self):
         """End AI dialogue mode and return to static dialogue"""
+        if self.ai_dialogue_instance and self.memory_enabled:
+            # Store conversation history for future interactions
+            memory_key = self.ai_dialogue_instance.get("memory_key", "default")
+            self.ai_conversation_memory[memory_key] = self.ai_dialogue_instance
+        
         self.dialogue_mode = "static"
         self.ai_dialogue_instance = None
-        # Optionally, change dialogue key based on game logic
     
     def _trim_ai_history_if_needed(self, max_messages=20):
         """Trim AI dialogue history if it gets too long"""
@@ -245,8 +273,26 @@ class StaticNPC(Entity):
                 *self.ai_dialogue_instance["history"][-max_messages+2:]
             ]
     
+    def toggle_memory(self):
+        """Toggle memory preservation for this NPC"""
+        self.memory_enabled = not self.memory_enabled
+        if self.ai_dialogue_instance:
+            self.ai_dialogue_instance["memory_enabled"] = self.memory_enabled
+        
+        # If memory disabled, clear all stored conversations
+        if not self.memory_enabled:
+            self.ai_conversation_memory = {}
+        
+        return f"Memory {'enabled' if self.memory_enabled else 'disabled'}"
+    
     def reset_dialogue(self):
         """Reset dialogue to default starting point and clear AI mode."""
         self.current_dialogue_key = "default"
         self.dialogue_mode = "static"
+        
+        # Preserve ai_dialogue_instance in memory if enabled
+        if self.ai_dialogue_instance and self.memory_enabled:
+            memory_key = self.ai_dialogue_instance.get("memory_key", "default")
+            self.ai_conversation_memory[memory_key] = self.ai_dialogue_instance
+        
         self.ai_dialogue_instance = None

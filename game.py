@@ -370,9 +370,19 @@ class Game:
                 
                 # Toggle NPC memory
                 elif event.key == pygame.K_m:
-                    if self.interacting_with and isinstance(self.interacting_with, AINPC):
-                        memory_status = self.interacting_with.toggle_memory()
-                        self.dialogue_system.show_dialogue(f"[System: {memory_status}]", is_response=True)
+                    if self.interacting_with:
+                        memory_status = None
+                        if isinstance(self.interacting_with, AINPC):
+                            memory_status = self.interacting_with.toggle_memory()
+                        elif isinstance(self.interacting_with, StaticNPC):
+                            memory_status = self.interacting_with.toggle_memory()
+                        
+                        if memory_status:
+                            self.dialogue_system.show_dialogue(f"[System: {memory_status}]", is_response=True)
+                            
+                            # If in AI dialogue mode, restart input after message
+                            if isinstance(self.interacting_with, StaticNPC) and self.interacting_with.dialogue_mode == "ai":
+                                self.dialogue_system.start_input_mode()
     
     def try_interaction(self):
         """Try interacting with an NPC nearby."""

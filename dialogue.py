@@ -232,13 +232,29 @@ class DialogueSystem:
             )
             surface.blit(input_text_surface, input_text_rect)
             
-            # Draw hint for AI dialogue mode
+            # Draw hints for AI dialogue mode
             hint_text = "Type 'exit' to end conversation"
             hint_surface = self.font.render(hint_text, True, GRAY)
             hint_rect = hint_surface.get_rect(
                 bottomright=(dialogue_bg.right - padding, dialogue_bg.bottom - padding // 2)
             )
             surface.blit(hint_surface, hint_rect)
+            
+            # Draw memory hint
+            memory_hint = "Press 'M' to toggle memory"
+            memory_hint_surface = self.font.render(memory_hint, True, GRAY)
+            memory_hint_rect = memory_hint_surface.get_rect(
+                bottomleft=(dialogue_bg.left + padding, dialogue_bg.bottom - padding // 2)
+            )
+            surface.blit(memory_hint_surface, memory_hint_rect)
+            
+            # Draw 'toggle memory' command hint
+            cmd_hint = "Or type 'toggle memory'"
+            cmd_hint_surface = self.font.render(cmd_hint, True, GRAY)
+            cmd_hint_rect = cmd_hint_surface.get_rect(
+                bottomleft=(dialogue_bg.left + padding, dialogue_bg.bottom - padding * 2)
+            )
+            surface.blit(cmd_hint_surface, cmd_hint_rect)
 
     def calculate_wrapped_lines(self, text, font, max_width):
         """Wrap text into lines that fit the width."""
