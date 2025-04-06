@@ -77,6 +77,27 @@ class InteractiveNPC(NPC):
     def reset_conversation(self):
         self.dialogue_tree.reset()
         self.requires_input = self.dialogue_tree.requires_input()
+        
+    def peek_next_response(self) -> str:
+        """Preview the next dialogue response without advancing the conversation
+        
+        Returns:
+            str: The text of the next node, or empty string if at the end
+        """
+        if not self.dialogue_tree.current_node:
+            return ""
+        
+        # Temporarily store the current node
+        current = self.dialogue_tree.current_node
+        
+        # Get next node without permanently advancing
+        next_node = current.get_next_node("")  # Empty string for non-input nodes
+        
+        # If there's no next node, return empty string
+        if not next_node:
+            return ""
+            
+        return next_node.text
 
 class AINPC(NPC):
     """NPC with AI-powered dialogue using OpenAI API"""
@@ -117,3 +138,13 @@ class AINPC(NPC):
     def reset_conversation(self):
         """Resets the conversation to its initial state"""
         self.conversation_history = self.initial_history.copy()
+        
+    def peek_next_response(self) -> str:
+        """AINPC conversations are always ongoing, so always returns non-empty string
+        
+        Returns:
+            str: A non-empty string to indicate conversation can continue
+        """
+        # For AI NPCs, we always want to show the dialogue input option
+        # So we return a dummy non-empty string
+        return "..."  # This is never displayed, just used for checking
