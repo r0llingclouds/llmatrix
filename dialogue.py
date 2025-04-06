@@ -150,27 +150,36 @@ class DialogueSystem:
             return
 
         padding = DIALOGUE_PADDING
+        # Use larger padding for the input section
+        inner_padding = padding * 2
 
         lines = self.calculate_wrapped_lines(self.current_text, self.font,
                                              self.text_rect.width - padding * 2)
 
         total_text_height = len(lines) * self.font.get_height()
-        required_height = total_text_height + padding * 2
         
-        # Add extra height for choices if needed
-        if self.has_choices and self.current_index == len(self.messages) - 1:
-            choice_height = len(self.choices) * (self.font.get_height() + 10)
-            required_height += choice_height + padding
-        
-        # Add extra height for input area
+        # Calculate required height differently based on mode
         if self.input_mode:
-            required_height += self.font.get_height() + padding * 2
+            # For input mode, we need separate areas for message and input
+            message_height = total_text_height + padding * 3  # Extra padding for text area
+            input_area_height = self.font.get_height() * 5  # More space for input and hints
+            required_height = message_height + input_area_height
+        else:
+            # For regular dialogue or choices
+            required_height = total_text_height + padding * 2
+            
+            # Add extra height for choices if needed
+            if self.has_choices and self.current_index == len(self.messages) - 1:
+                choice_height = len(self.choices) * (self.font.get_height() + 10)
+                required_height += choice_height + padding
 
+        # Resize dialogue box if needed
         if required_height > self.text_rect.height:
             y_offset = required_height - self.text_rect.height
             self.text_rect.y -= y_offset
             self.text_rect.height = required_height
 
+        # Create dialogue background
         dialogue_bg = pygame.Rect(
             self.text_rect.left - padding,
             self.text_rect.top - padding,
@@ -178,6 +187,7 @@ class DialogueSystem:
             self.text_rect.height + padding * 2
         )
 
+        # Draw background
         bg_surface = pygame.Surface((dialogue_bg.width, dialogue_bg.height), pygame.SRCALPHA)
         bg_surface.fill(DIALOGUE_BG)
         surface.blit(bg_surface, (dialogue_bg.left, dialogue_bg.top))
@@ -193,10 +203,20 @@ class DialogueSystem:
         else:
             text_top = dialogue_bg.top + padding
 
-        # Draw the main dialogue text
-        self.draw_text_lines(surface, lines, self.font, WHITE,
-                             pygame.Rect(dialogue_bg.left + padding, text_top,
-                                         dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
+        # Calculate text display area - make sure it doesn't overlap with input area
+        text_display_height = self.text_rect.height
+        if self.input_mode:
+            text_display_height = text_display_height - (self.font.get_height() * 5) - inner_padding
+            
+        # Draw the main dialogue text in its own area
+        text_display_rect = pygame.Rect(
+            dialogue_bg.left + padding, 
+            text_top,
+            dialogue_bg.width - padding * 2, 
+            text_display_height
+        )
+        
+        self.draw_text_lines(surface, lines, self.font, WHITE, text_display_rect)
 
         # Draw choices if showing the last message and choices are available
         if self.has_choices and self.current_index == len(self.messages) - 1:
@@ -204,24 +224,30 @@ class DialogueSystem:
 
         # Draw input area if in input mode
         if self.input_mode:
-            input_y = dialogue_bg.bottom - self.font.get_height() - padding * 2
+            # Calculate position for input field with spacer but no visible line
+            separator_y = dialogue_bg.top + text_display_height + inner_padding
             
-            if self.input_rect is None or self.input_rect.y != input_y:
-                self.input_rect = pygame.Rect(
-                    dialogue_bg.left + padding,
-                    input_y,
-                    dialogue_bg.width - padding * 2,
-                    self.font.get_height() + padding
-                )
+            # Position input field below the text area with padding
+            input_y = separator_y + inner_padding
             
+            # Create input field rect with more height
+            self.input_rect = pygame.Rect(
+                dialogue_bg.left + padding,
+                input_y,
+                dialogue_bg.width - padding * 2,
+                self.font.get_height() + padding
+            )
+            
+            # Draw input field background
             input_bg_surface = pygame.Surface((self.input_rect.width, self.input_rect.height), pygame.SRCALPHA)
             input_bg_surface.fill(INPUT_BG)
             surface.blit(input_bg_surface, self.input_rect)
 
+            # Draw prompt and input text
             prompt_text = "> "
             prompt_surface = self.font.render(prompt_text, True, WHITE)
             prompt_rect = prompt_surface.get_rect(
-                topleft=(self.input_rect.left + 5, self.input_rect.top + padding // 2)
+                topleft=(self.input_rect.left + padding, self.input_rect.top + padding // 2)
             )
             surface.blit(prompt_surface, prompt_rect)
 
@@ -232,29 +258,32 @@ class DialogueSystem:
             )
             surface.blit(input_text_surface, input_text_rect)
             
-            # Draw hints for AI dialogue mode
-            hint_text = "Type 'exit' to end conversation"
-            hint_surface = self.font.render(hint_text, True, GRAY)
-            hint_rect = hint_surface.get_rect(
-                bottomright=(dialogue_bg.right - padding, dialogue_bg.bottom - padding // 2)
-            )
-            surface.blit(hint_surface, hint_rect)
+            # Draw hints in a clearly separated area below input field with more spacing
+            hint_area_top = self.input_rect.bottom + inner_padding
             
-            # Draw memory hint
-            memory_hint = "Press 'M' to toggle memory"
-            memory_hint_surface = self.font.render(memory_hint, True, GRAY)
-            memory_hint_rect = memory_hint_surface.get_rect(
-                bottomleft=(dialogue_bg.left + padding, dialogue_bg.bottom - padding // 2)
+            # Draw left side hints with more spacing from edge
+            left_hint1 = "Press 'M' to toggle memory"
+            left_hint_surface1 = self.font.render(left_hint1, True, GRAY)
+            left_hint_rect1 = left_hint_surface1.get_rect(
+                topleft=(dialogue_bg.left + inner_padding, hint_area_top)
             )
-            surface.blit(memory_hint_surface, memory_hint_rect)
+            surface.blit(left_hint_surface1, left_hint_rect1)
             
-            # Draw 'toggle memory' command hint
-            cmd_hint = "Or type 'toggle memory'"
-            cmd_hint_surface = self.font.render(cmd_hint, True, GRAY)
-            cmd_hint_rect = cmd_hint_surface.get_rect(
-                bottomleft=(dialogue_bg.left + padding, dialogue_bg.bottom - padding * 2)
+            # Second left hint below the first with more spacing
+            left_hint2 = "Or type 'toggle memory'"
+            left_hint_surface2 = self.font.render(left_hint2, True, GRAY)
+            left_hint_rect2 = left_hint_surface2.get_rect(
+                topleft=(dialogue_bg.left + inner_padding, left_hint_rect1.bottom + padding)
             )
-            surface.blit(cmd_hint_surface, cmd_hint_rect)
+            surface.blit(left_hint_surface2, left_hint_rect2)
+            
+            # Draw right side hint with more spacing from edge
+            right_hint = "Type 'exit' to end conversation"
+            right_hint_surface = self.font.render(right_hint, True, GRAY)
+            right_hint_rect = right_hint_surface.get_rect(
+                topright=(dialogue_bg.right - inner_padding, hint_area_top)
+            )
+            surface.blit(right_hint_surface, right_hint_rect)
 
     def calculate_wrapped_lines(self, text, font, max_width):
         """Wrap text into lines that fit the width."""
