@@ -132,8 +132,14 @@ class DialogueSystem:
         self.response_mode = is_response
         self.final_response = is_final
         
-        self.text_surface = self.font.render(text, True, WHITE)
-        self.text_rect = self.text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80))
+        # We'll calculate this dynamically in draw_wrapped_text now
+        # Keep the text_rect for positioning the dialogue box but make it a reasonable default size
+        self.text_rect = pygame.Rect(
+            SCREEN_WIDTH // 4,
+            SCREEN_HEIGHT - 130,  # Position higher to accommodate multiple lines
+            SCREEN_WIDTH // 2,
+            80  # Taller to fit wrapped text
+        )
         
         if is_response:
             instruction_text = "Press Enter to exit" if is_final else "Press Enter to continue"
@@ -198,7 +204,9 @@ class DialogueSystem:
         bg_surface.fill(DIALOGUE_BG)
         surface.blit(bg_surface, (dialogue_bg.left, dialogue_bg.top))
         
-        surface.blit(self.text_surface, self.text_rect)
+        self.draw_wrapped_text(surface, self.current_text, self.font, WHITE, 
+                              pygame.Rect(dialogue_bg.left + padding, dialogue_bg.top + padding,
+                                         dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
         
         if self.response_mode:
             surface.blit(self.instruction_surface, self.instruction_rect)
@@ -212,3 +220,31 @@ class DialogueSystem:
             input_text_surface = self.font.render(display_text, True, WHITE)
             input_text_rect = input_text_surface.get_rect(midleft=(self.input_rect.left + 10, self.input_rect.centery))
             surface.blit(input_text_surface, input_text_rect)
+    
+    def draw_wrapped_text(self, surface, text, font, color, rect):
+        """Draws text with word wrapping"""
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+        
+        for word in words:
+            test_line = current_line + word + " "
+            test_surface = font.render(test_line, True, color)
+            if test_surface.get_width() <= rect.width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word + " "
+        
+        lines.append(current_line)  # Add the last line
+        
+        # Calculate total height of text
+        total_height = len(lines) * font.get_height()
+        
+        # Draw each line centered horizontally within the rect
+        y_pos = rect.top + (rect.height - total_height) // 2
+        for line in lines:
+            line_surface = font.render(line, True, color)
+            line_rect = line_surface.get_rect(centerx=rect.centerx, top=y_pos)
+            surface.blit(line_surface, line_rect)
+            y_pos += font.get_height()
