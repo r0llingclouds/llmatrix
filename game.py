@@ -70,8 +70,8 @@ class Game:
         # Add AINPC if OpenAI client is available, else fallback to simple NPC
         if self.client:
             self.npcs.append(AINPC(500, 300, YELLOW, self.client,
-                                  "You are a wise old sage in a fantasy game.",
-                                  "Greetings, traveler. What knowledge do you seek?"))
+                                  "You are an assistant.",
+                                  "Hello, how can I help you today?"))
         else:
             self.npcs.append(NPC(500, 300, YELLOW, ["The sage is silent today."]))
         
@@ -111,8 +111,8 @@ class Game:
                                 
                                 # Mark as final only if there's no next response
                                 self.dialogue_system.show_dialogue(response, is_response=True, is_final=is_final or not has_next)
-                            if isinstance(self.interacting_with, InteractiveNPC) and self.interacting_with.dialogue_tree.current_node:
-                                self.interacting_with.dialogue_tree.current_node.enter()
+                                if isinstance(self.interacting_with, InteractiveNPC) and self.interacting_with.dialogue_tree.current_node:
+                                    self.interacting_with.dialogue_tree.current_node.enter()
                     elif event.key == pygame.K_BACKSPACE:
                         self.dialogue_system.remove_character()
                     elif event.unicode and event.unicode.isprintable():
@@ -161,6 +161,10 @@ class Game:
                     else:
                         self.try_interaction()
                     self.interaction_cooldown = 10
+                elif event.key == pygame.K_m:
+                    if self.interacting_with and isinstance(self.interacting_with, AINPC):
+                        memory_status = self.interacting_with.toggle_memory()
+                        self.dialogue_system.show_dialogue(f"[System: {memory_status}]", is_response=True)
     
     def try_interaction(self):
         """Attempt to interact with an NPC within range"""
