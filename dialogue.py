@@ -132,20 +132,19 @@ class DialogueSystem:
         self.response_mode = is_response
         self.final_response = is_final
         
-        # We'll calculate this dynamically in draw_wrapped_text now
-        # Keep the text_rect for positioning the dialogue box but make it a reasonable default size
+        # Create a wider dialogue box that scales better with content
         self.text_rect = pygame.Rect(
-            SCREEN_WIDTH // 4,
-            SCREEN_HEIGHT - 130,  # Position higher to accommodate multiple lines
-            SCREEN_WIDTH // 2,
-            80  # Taller to fit wrapped text
+            SCREEN_WIDTH // 8,  # Start from 1/8 of screen width (wider)
+            SCREEN_HEIGHT - 150,  # Position higher
+            SCREEN_WIDTH * 3 // 4,  # Use 3/4 of screen width
+            100  # Taller to fit wrapped text
         )
         
         if is_response:
             instruction_text = "Press Enter to exit" if is_final else "Press Enter to continue"
             self.instruction_surface = self.font.render(instruction_text, True, WHITE)
             self.instruction_rect = self.instruction_surface.get_rect(
-                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40)
+                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
             )
     
     def start_input_mode(self):
@@ -193,6 +192,23 @@ class DialogueSystem:
             return
         
         padding = DIALOGUE_PADDING
+        
+        # Calculate the text lines first to determine proper box height
+        lines = self.calculate_wrapped_lines(self.current_text, self.font, 
+                                            self.text_rect.width - padding * 2)
+        
+        # Calculate required height based on content
+        total_text_height = len(lines) * self.font.get_height()
+        required_height = total_text_height + padding * 2
+        
+        # Update dialogue box height if needed
+        if required_height > self.text_rect.height:
+            # Adjust vertical position to keep bottom aligned
+            y_offset = required_height - self.text_rect.height
+            self.text_rect.y -= y_offset
+            self.text_rect.height = required_height
+        
+        # Create the dialogue background
         dialogue_bg = pygame.Rect(
             self.text_rect.left - padding,
             self.text_rect.top - padding,
@@ -200,13 +216,15 @@ class DialogueSystem:
             self.text_rect.height + padding * 2
         )
         
+        # Draw the background
         bg_surface = pygame.Surface((dialogue_bg.width, dialogue_bg.height), pygame.SRCALPHA)
         bg_surface.fill(DIALOGUE_BG)
         surface.blit(bg_surface, (dialogue_bg.left, dialogue_bg.top))
         
-        self.draw_wrapped_text(surface, self.current_text, self.font, WHITE, 
-                              pygame.Rect(dialogue_bg.left + padding, dialogue_bg.top + padding,
-                                         dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
+        # Draw the wrapped text using pre-calculated lines
+        self.draw_text_lines(surface, lines, self.font, WHITE, 
+                            pygame.Rect(dialogue_bg.left + padding, dialogue_bg.top + padding,
+                                        dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
         
         if self.response_mode:
             surface.blit(self.instruction_surface, self.instruction_rect)
@@ -221,30 +239,45 @@ class DialogueSystem:
             input_text_rect = input_text_surface.get_rect(midleft=(self.input_rect.left + 10, self.input_rect.centery))
             surface.blit(input_text_surface, input_text_rect)
     
-    def draw_wrapped_text(self, surface, text, font, color, rect):
-        """Draws text with word wrapping"""
+    def calculate_wrapped_lines(self, text, font, max_width):
+        """Calculate wrapped lines without drawing them"""
         words = text.split(' ')
         lines = []
         current_line = ""
         
         for word in words:
             test_line = current_line + word + " "
-            test_surface = font.render(test_line, True, color)
-            if test_surface.get_width() <= rect.width:
+            test_surface = font.render(test_line, True, (0, 0, 0))  # Color doesn't matter for width calculation
+            if test_surface.get_width() <= max_width:
                 current_line = test_line
             else:
                 lines.append(current_line)
                 current_line = word + " "
         
         lines.append(current_line)  # Add the last line
-        
+        return lines
+    
+    def draw_text_lines(self, surface, lines, font, color, rect):
+        """Draw pre-calculated text lines"""
         # Calculate total height of text
         total_height = len(lines) * font.get_height()
         
-        # Draw each line centered horizontally within the rect
-        y_pos = rect.top + (rect.height - total_height) // 2
+        # Align top if text is taller than available space
+        if total_height > rect.height:
+            y_pos = rect.top
+        else:
+            # Center vertically if there's space
+            y_pos = rect.top + (rect.height - total_height) // 2
+        
+        # Draw each line
         for line in lines:
-            line_surface = font.render(line, True, color)
-            line_rect = line_surface.get_rect(centerx=rect.centerx, top=y_pos)
-            surface.blit(line_surface, line_rect)
+            if line.strip():  # Only draw non-empty lines
+                line_surface = font.render(line, True, color)
+                line_rect = line_surface.get_rect(midtop=(rect.centerx, y_pos))
+                surface.blit(line_surface, line_rect)
             y_pos += font.get_height()
+    
+    def draw_wrapped_text(self, surface, text, font, color, rect):
+        """Legacy wrapped text drawing function - now uses the two-step process"""
+        lines = self.calculate_wrapped_lines(text, font, rect.width)
+        self.draw_text_lines(surface, lines, font, color, rect)
