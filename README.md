@@ -94,6 +94,7 @@
 - The game requires an active internet connection for OpenAI API calls.
 - NPC memory can be toggled with `M`, affecting whether conversation history persists.
 - Error handling for API failures is basic; expect occasional "Sorry, I couldn't respond" messages.
+- interesting https://github.com/xdoko01/Game-Console
 
 ## Contributing
 Feel free to fork this repository, submit issues, or create pull requests. Contributions to enhance the AI, add new features, or improve the UI are welcome!
