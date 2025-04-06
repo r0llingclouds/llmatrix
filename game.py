@@ -1,87 +1,39 @@
 import pygame
-import openai  # For OpenAI API integration
-import os  # For environment variable access
-from entities import Player, NPC, InteractiveNPC, AINPC, Entity
-from dialogue import DialogueNode, DialogueTree, DialogueSystem
+import openai
+import os
+from entities import Player, AINPC, Entity
+from dialogue import DialogueSystem
 from constants import *
 
 class Game:
-    """Main game class managing all game elements"""
     def __init__(self):
-        # Initialize Pygame window
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Simple 2D RPG")
         self.clock = pygame.time.Clock()
         self.running = True
-        
-        # Initialize OpenAI client
+
         api_key = os.getenv("OPENAI_API_KEY")
-        if api_key:
-            self.client = openai.OpenAI(api_key=api_key)
-        else:
-            self.client = None
-            print("Warning: OPENAI_API_KEY not set. AI NPCs will not function.")
-        
-        # Create player at center of screen
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not set. AI NPCs require an API key.")
+        self.client = openai.OpenAI(api_key=api_key)
+
         self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        
-        # Define walls for collision
+
         self.walls = [
             Entity(100, 100, 50, 200, RED),
             Entity(300, 200, 200, 50, RED),
             Entity(600, 300, 50, 200, RED),
         ]
 
-        self.npcs = []
-        
-        # Example InteractiveNPC with a dialogue tree
-        # dialogue = DialogueTree("Hello, adventurer!")
-        # branch_node = DialogueNode("Let me see your equipment.", is_input=False)
-        # has_sword_node = DialogueNode("Ah, you have a fine sword!", is_input=False)
-        # no_sword_node = DialogueNode("You should get a sword for protection.", is_input=False)
-        # end_node = DialogueNode("Safe travels!", is_input=False)
-        # dialogue.root.set_default_next(branch_node)
-        # branch_node.add_conditional_next(None, lambda: self.player.has_item('sword'), has_sword_node)
-        # branch_node.add_conditional_next(None, lambda: not self.player.has_item('sword'), no_sword_node)
-        # has_sword_node.set_default_next(end_node)
-        # no_sword_node.set_default_next(end_node)
-        # self.npcs.append(InteractiveNPC(350, 300, PURPLE, dialogue))
+        self.npcs = [
+            AINPC(350, 300, YELLOW, self.client, "You are a helpful assistant.", "Hello, how can I assist you today?")
+        ]
 
-        inventory_dialogue = DialogueTree("Hello, do you have the key to the dungeon?")
-        ask_key = DialogueNode("Do you have the key?", is_input=True)
-        has_key_response = DialogueNode("Great! You can enter the dungeon now.")
-        no_key_response = DialogueNode("You don't have the key! Don't lie to me.")
-        need_key_response = DialogueNode("You need to find the key first.")
-        invalid_response = DialogueNode("Please answer yes or no.")
-        dungeon_farewell = DialogueNode("Good luck in the dungeon!")
-        goodbye = DialogueNode("Goodbye.")
-        come_back = DialogueNode("Come back when you have the key.")
-        inventory_dialogue.root.set_default_next(ask_key)
-        ask_key.add_conditional_next("yes", lambda: self.player.has_item('key'), has_key_response)
-        ask_key.add_conditional_next("yes", lambda: not self.player.has_item('key'), no_key_response)
-        ask_key.add_conditional_next("no", lambda: True, need_key_response)
-        ask_key.set_default_next(invalid_response)
-        has_key_response.set_default_next(dungeon_farewell)
-        no_key_response.set_default_next(goodbye)
-        need_key_response.set_default_next(come_back)
-        self.npcs.append(InteractiveNPC(350, 300, PURPLE, inventory_dialogue))
-
-
-        # Add AINPC if OpenAI client is available, else fallback to simple NPC
-        if self.client:
-            self.npcs.append(AINPC(500, 300, YELLOW, self.client,
-                                  "You are an assistant.",
-                                  "Hello, how can I help you today?"))
-        else:
-            self.npcs.append(NPC(500, 300, YELLOW, ["The sage is silent today."]))
-        
-        # Initialize dialogue system and interaction state
         self.dialogue_system = DialogueSystem()
         self.interacting_with = None
         self.interaction_cooldown = 0
-    
+
     def handle_input(self):
-        """Handle all user input events"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -89,7 +41,7 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     if self.dialogue_system.active:
                         self.dialogue_system.close()
-                        if hasattr(self.interacting_with, 'reset_conversation'):
+                        if self.interacting_with:
                             self.interacting_with.reset_conversation()
                         self.interacting_with = None
                     else:
@@ -97,22 +49,9 @@ class Game:
                 elif self.dialogue_system.input_mode:
                     if event.key == pygame.K_RETURN:
                         player_input = self.dialogue_system.submit_input()
-                        if self.interacting_with.is_conversational:
-                            response = self.interacting_with.respond_to_input(player_input)
-                            is_final = self.interacting_with.is_conversation_complete()
-                            if self.interacting_with.requires_input and not is_final:
-                                self.dialogue_system.show_dialogue(response)
-                                self.dialogue_system.start_input_mode()
-                            else:
-                                # Check if this is actually the final message
-                                has_next = False
-                                if isinstance(self.interacting_with, (InteractiveNPC, AINPC)) and not is_final:
-                                    has_next = bool(self.interacting_with.peek_next_response())
-                                
-                                # Mark as final only if there's no next response
-                                self.dialogue_system.show_dialogue(response, is_response=True, is_final=is_final or not has_next)
-                                if isinstance(self.interacting_with, InteractiveNPC) and self.interacting_with.dialogue_tree.current_node:
-                                    self.interacting_with.dialogue_tree.current_node.enter()
+                        response = self.interacting_with.respond_to_input(player_input)
+                        self.dialogue_system.show_dialogue(response)
+                        self.dialogue_system.start_input_mode()
                     elif event.key == pygame.K_BACKSPACE:
                         self.dialogue_system.remove_character()
                     elif event.unicode and event.unicode.isprintable():
@@ -120,44 +59,7 @@ class Game:
                 elif event.key == pygame.K_RETURN and self.interaction_cooldown <= 0:
                     if self.dialogue_system.active:
                         if self.dialogue_system.response_mode:
-                            if self.dialogue_system.final_response:
-                                self.dialogue_system.close()
-                                if hasattr(self.interacting_with, 'reset_conversation'):
-                                    self.interacting_with.reset_conversation()
-                                self.interacting_with = None
-                                self.interaction_cooldown = 30
-                            else:
-                                if self.interacting_with.is_conversational:
-                                    if self.interacting_with.requires_input:
-                                        self.dialogue_system.start_input_mode()
-                                    else:
-                                        # Check if there's a valid next response (not empty) before advancing
-                                        next_text = ""
-                                        if isinstance(self.interacting_with, InteractiveNPC):
-                                            next_text = self.interacting_with.peek_next_response()
-                                        
-                                        if next_text:
-                                            # Only show next response if it's not empty
-                                            next_text = self.interacting_with.respond_to_input("")
-                                            is_final = self.interacting_with.is_conversation_complete()
-                                            self.dialogue_system.show_dialogue(next_text, is_response=True, is_final=is_final)
-                                            if isinstance(self.interacting_with, InteractiveNPC) and self.interacting_with.dialogue_tree.current_node:
-                                                self.interacting_with.dialogue_tree.current_node.enter()
-                                        else:
-                                            # End conversation naturally if next response would be empty
-                                            self.dialogue_system.close()
-                                            if hasattr(self.interacting_with, 'reset_conversation'):
-                                                self.interacting_with.reset_conversation()
-                                            self.interacting_with = None
-                                            self.interaction_cooldown = 30
-                                else:  # Simple NPC
-                                    next_dialogue = self.interacting_with.interact()
-                                    if next_dialogue:
-                                        self.dialogue_system.show_dialogue(next_dialogue, is_response=True)
-                                    else:
-                                        self.dialogue_system.close()
-                                        self.interacting_with = None
-                                        self.interaction_cooldown = 30
+                            self.dialogue_system.start_input_mode()
                     else:
                         self.try_interaction()
                     self.interaction_cooldown = 10
@@ -165,9 +67,8 @@ class Game:
                     if self.interacting_with and isinstance(self.interacting_with, AINPC):
                         memory_status = self.interacting_with.toggle_memory()
                         self.dialogue_system.show_dialogue(f"[System: {memory_status}]", is_response=True)
-    
+
     def try_interaction(self):
-        """Attempt to interact with an NPC within range"""
         interaction_range = pygame.Rect(
             self.player.rect.x - 20,
             self.player.rect.y - 20,
@@ -180,12 +81,9 @@ class Game:
                 if dialogue:
                     self.dialogue_system.show_dialogue(dialogue, is_response=True)
                     self.interacting_with = npc
-                    if isinstance(npc, InteractiveNPC):
-                        npc.dialogue_tree.current_node.enter()
                 break
-    
+
     def update(self):
-        """Update game state"""
         self.handle_input()
         self.dialogue_system.update()
         if self.interaction_cooldown > 0:
@@ -203,9 +101,8 @@ class Game:
                 dy = self.player.speed
             if dx != 0 or dy != 0:
                 self.player.move(dx, dy, self.walls)
-    
+
     def draw(self):
-        """Render all game elements"""
         self.screen.fill(BLACK)
         for wall in self.walls:
             wall.draw(self.screen)
@@ -214,9 +111,8 @@ class Game:
         self.player.draw(self.screen)
         self.dialogue_system.draw(self.screen)
         pygame.display.flip()
-    
+
     def run(self):
-        """Main game loop"""
         while self.running:
             self.update()
             self.draw()
