@@ -1,9 +1,8 @@
-# entities.py
-
 import pygame
 from typing import List, Tuple
 from constants import *
 from dialogue import DialogueTree
+import openai  # Required for AINPC
 
 class Entity:
     """Base class for all game entities"""
@@ -37,31 +36,23 @@ class Player(Entity):
         self.rect.y = max(0, min(SCREEN_HEIGHT - self.rect.height, self.rect.y))
     
     def has_item(self, item_name: str) -> bool:
-        """
-        Check if the player has a specific item in their inventory.
-        
-        Args:
-            item_name (str): The name of the item to check for.
-        
-        Returns:
-            bool: True if the item is in the inventory, False otherwise.
-        """
         return item_name.lower() in (item.lower() for item in self.inventory)
 
 class NPC(Entity):
-    """Non-player character with dialogue"""
+    """Non-player character with simple dialogue"""
     def __init__(self, x: int, y: int, color: Tuple[int, int, int], dialogue: List[str]):
         super().__init__(x, y, NPC_SIZE, NPC_SIZE, color)
         self.dialogue = dialogue
         self.dialogue_index = 0
         self.requires_input = False
+        self.is_conversational = False  # Indicates this is not a conversational NPC
     
     def interact(self) -> str:
         if self.dialogue_index < len(self.dialogue):
             message = self.dialogue[self.dialogue_index]
             self.dialogue_index += 1
             return message
-        self.dialogue_index = 0
+        self.dialogue_index = 0  # Reset for next interaction
         return ""
 
 class InteractiveNPC(NPC):
@@ -70,6 +61,7 @@ class InteractiveNPC(NPC):
         super().__init__(x, y, color, [dialogue_tree.get_current_text()])
         self.dialogue_tree = dialogue_tree
         self.requires_input = dialogue_tree.requires_input()
+        self.is_conversational = True  # Mark as conversational
     
     def interact(self) -> str:
         return self.dialogue_tree.get_current_text()
@@ -79,31 +71,49 @@ class InteractiveNPC(NPC):
         self.requires_input = self.dialogue_tree.requires_input()
         return response
     
-    def peek_next_response(self) -> str:
-        """Preview the next dialogue response without advancing the conversation
-        
-        Returns:
-            str: The text of the next dialogue node, or empty string if at the end
-        """
-        if not self.dialogue_tree.current_node:
-            return ""
-        
-        # Temporarily store the current node
-        current = self.dialogue_tree.current_node
-        
-        # Get next node without permanently advancing
-        next_node = current.get_next_node("")  # Empty string for non-input nodes
-        
-        # If there's no next node, return empty string
-        if not next_node:
-            return ""
-            
-        # Return the text and restore current node
-        return next_node.text
-    
     def is_conversation_complete(self) -> bool:
         return self.dialogue_tree.is_at_end()
     
     def reset_conversation(self):
         self.dialogue_tree.reset()
         self.requires_input = self.dialogue_tree.requires_input()
+
+class AINPC(NPC):
+    """NPC with AI-powered dialogue using OpenAI API"""
+    def __init__(self, x: int, y: int, color: Tuple[int, int, int], client: openai.OpenAI, system_content: str, initial_assistant_content: str):
+        super().__init__(x, y, color, [])
+        self.client = client
+        self.initial_history = [
+            {"role": "system", "content": system_content},
+            {"role": "assistant", "content": initial_assistant_content}
+        ]
+        self.conversation_history = self.initial_history.copy()
+        self.is_conversational = True
+        self.requires_input = True  # Always expects input after responses
+    
+    def interact(self) -> str:
+        """Returns the initial greeting from the assistant"""
+        return self.conversation_history[1]["content"]
+    
+    def respond_to_input(self, player_input: str) -> str:
+        """Processes player input and generates an AI response"""
+        self.conversation_history.append({"role": "user", "content": player_input})
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=self.conversation_history
+            )
+            assistant_message = response.choices[0].message.content
+            self.conversation_history.append({"role": "assistant", "content": assistant_message})
+            return assistant_message
+        except Exception as e:
+            print(f"API Error: {e}")
+            return "Sorry, I couldn't respond right now."
+    
+    def is_conversation_complete(self) -> bool:
+        """AINPC conversations are open-ended"""
+        return False
+    
+    def reset_conversation(self):
+        """Resets the conversation to its initial state"""
+        self.conversation_history = self.initial_history.copy()
