@@ -219,18 +219,22 @@ self.npcs.append(InteractiveNPC(350, 300, PURPLE, inventory_dialogue))
 **Code Example**:
 ```python
 quest_dialogue = DialogueTree("I have a quest for you. Are you interested?")
+
 ask_quest = DialogueNode("Do you want to take the quest to defeat the goblin king?", is_input=True)
+
 accept_quest = DialogueNode("Excellent! The goblin king is in the forest.", action=lambda: self.start_quest('goblin_quest'))
 reject_quest = DialogueNode("Maybe another time then.")
 invalid_response = DialogueNode("Please answer yes or no.")
 good_luck = DialogueNode("Good luck, hero!")
 farewell = DialogueNode("Farewell.")
+
 quest_dialogue.root.set_default_next(ask_quest)
 ask_quest.add_conditional_next("yes", lambda: True, accept_quest)
 ask_quest.add_conditional_next("no", lambda: True, reject_quest)
 ask_quest.set_default_next(invalid_response)
 accept_quest.set_default_next(good_luck)
 reject_quest.set_default_next(farewell)
+
 self.npcs.append(InteractiveNPC(350, 300, PURPLE, quest_dialogue))
 ```
 
@@ -240,16 +244,20 @@ self.npcs.append(InteractiveNPC(350, 300, PURPLE, quest_dialogue))
 **Code Example**:
 ```python
 self.player.inventory.append("sword") 
+
 dialogue = DialogueTree("Hello, adventurer!")
+
 branch_node = DialogueNode("Let me see your equipment.", is_input=False)
 has_sword_node = DialogueNode("Ah, you have a fine sword!", is_input=False)
 no_sword_node = DialogueNode("You should get a sword for protection.", is_input=False)
 end_node = DialogueNode("Safe travels!", is_input=False)
+
+dialogue.root.set_default_next(branch_node)
 branch_node.add_conditional_next(None, lambda: self.player.has_item('sword'), has_sword_node)
 branch_node.add_conditional_next(None, lambda: not self.player.has_item('sword'), no_sword_node)
 has_sword_node.set_default_next(end_node)
 no_sword_node.set_default_next(end_node)
-dialogue.root.set_default_next(branch_node)
+
 self.npcs.append(InteractiveNPC(350, 300, PURPLE, dialogue))
 ```
 

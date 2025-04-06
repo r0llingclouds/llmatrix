@@ -26,14 +26,21 @@ class Game:
 
         self.npcs = []
         
-        # Simple NPC Dialogue
-        simple_dialogue = DialogueTree("Hello, adventurer!")
-        simple_dialogue.root.set_default_next(DialogueNode("Welcome to our village."))
-        simple_dialogue.root.default_next.set_default_next(DialogueNode("Feel free to look around."))
-        simple_dialogue.root.default_next.default_next.set_default_next(DialogueNode("Goodbye!"))
-        self.npcs.append(
-            InteractiveNPC(350, 300, PURPLE, simple_dialogue)
-        )
+        self.player.inventory.append("sword") 
+        dialogue = DialogueTree("Hello, adventurer!")
+
+        branch_node = DialogueNode("Let me see your equipment.", is_input=False)
+        has_sword_node = DialogueNode("Ah, you have a fine sword!", is_input=False)
+        no_sword_node = DialogueNode("You should get a sword for protection.", is_input=False)
+        end_node = DialogueNode("Safe travels!", is_input=False)
+
+        dialogue.root.set_default_next(branch_node)
+        branch_node.add_conditional_next(None, lambda: self.player.has_item('sword'), has_sword_node)
+        branch_node.add_conditional_next(None, lambda: not self.player.has_item('sword'), no_sword_node)
+        has_sword_node.set_default_next(end_node)
+        no_sword_node.set_default_next(end_node)
+
+        self.npcs.append(InteractiveNPC(350, 300, PURPLE, dialogue))
 
         # Initialize dialogue system and interaction state
         self.dialogue_system = DialogueSystem()
@@ -65,7 +72,9 @@ class Game:
                         player_input = self.dialogue_system.submit_input()
                         if isinstance(self.interacting_with, InteractiveNPC):
                             response = self.interacting_with.respond_to_input(player_input)
-                            is_final = self.interacting_with.is_conversation_complete()
+                            # Check if this is the last meaningful message
+                            next_would_be_empty = response.strip() != "" and self.interacting_with.peek_next_response() == ""
+                            is_final = self.interacting_with.is_conversation_complete() or next_would_be_empty
                             if self.interacting_with.requires_input and not is_final:
                                 self.dialogue_system.show_dialogue(response)
                                 self.dialogue_system.start_input_mode()
@@ -92,7 +101,9 @@ class Game:
                                 else:
                                     if isinstance(self.interacting_with, InteractiveNPC):
                                         next_text = self.interacting_with.respond_to_input("")
-                                        is_final = self.interacting_with.is_conversation_complete()
+                                        # Check if this is the last meaningful message
+                                        next_would_be_empty = next_text.strip() != "" and self.interacting_with.peek_next_response() == ""
+                                        is_final = self.interacting_with.is_conversation_complete() or next_would_be_empty
                                         self.dialogue_system.show_dialogue(next_text, is_response=True, is_final=is_final)
                                         if self.interacting_with.dialogue_tree.current_node:
                                             self.interacting_with.dialogue_tree.current_node.enter()

@@ -79,6 +79,28 @@ class InteractiveNPC(NPC):
         self.requires_input = self.dialogue_tree.requires_input()
         return response
     
+    def peek_next_response(self) -> str:
+        """Preview the next dialogue response without advancing the conversation
+        
+        Returns:
+            str: The text of the next dialogue node, or empty string if at the end
+        """
+        if not self.dialogue_tree.current_node:
+            return ""
+        
+        # Temporarily store the current node
+        current = self.dialogue_tree.current_node
+        
+        # Get next node without permanently advancing
+        next_node = current.get_next_node("")  # Empty string for non-input nodes
+        
+        # If there's no next node, return empty string
+        if not next_node:
+            return ""
+            
+        # Return the text and restore current node
+        return next_node.text
+    
     def is_conversation_complete(self) -> bool:
         return self.dialogue_tree.is_at_end()
     
