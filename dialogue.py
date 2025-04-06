@@ -160,10 +160,11 @@ class DialogueSystem:
         
         # Calculate required height differently based on mode
         if self.input_mode:
-            # For input mode, we need separate areas for message and input
+            # For input mode, we need separate areas for message, input, and hints
             message_height = total_text_height + padding * 3  # Extra padding for text area
-            input_area_height = self.font.get_height() * 5  # More space for input and hints
-            required_height = message_height + input_area_height
+            input_height = self.font.get_height() + padding  # Input field height
+            hint_height = self.font.get_height() * 2 + padding * 3  # Two lines of hints with padding
+            required_height = message_height + input_height + hint_height + inner_padding * 2
         else:
             # For regular dialogue or choices
             required_height = total_text_height + padding * 2
@@ -204,9 +205,11 @@ class DialogueSystem:
             text_top = dialogue_bg.top + padding
 
         # Calculate text display area - make sure it doesn't overlap with input area
-        text_display_height = self.text_rect.height
         if self.input_mode:
-            text_display_height = text_display_height - (self.font.get_height() * 5) - inner_padding
+            # Reserve space for input field and hints at the bottom
+            text_display_height = self.text_rect.height - (self.font.get_height() * 3) - inner_padding * 2 - padding
+        else:
+            text_display_height = self.text_rect.height
             
         # Draw the main dialogue text in its own area
         text_display_rect = pygame.Rect(
@@ -228,7 +231,7 @@ class DialogueSystem:
             separator_y = dialogue_bg.top + text_display_height + inner_padding
             
             # Position input field below the text area with padding
-            input_y = separator_y + inner_padding
+            input_y = separator_y
             
             # Create input field rect with more height
             self.input_rect = pygame.Rect(
@@ -259,7 +262,8 @@ class DialogueSystem:
             surface.blit(input_text_surface, input_text_rect)
             
             # Draw hints in a clearly separated area below input field with more spacing
-            hint_area_top = self.input_rect.bottom + inner_padding
+            # Make sure they're inside the dialogue background
+            hint_area_top = self.input_rect.bottom + padding
             
             # Draw left side hints with more spacing from edge
             left_hint1 = "Press 'M' to toggle memory"
@@ -273,7 +277,7 @@ class DialogueSystem:
             left_hint2 = "Or type 'toggle memory'"
             left_hint_surface2 = self.font.render(left_hint2, True, GRAY)
             left_hint_rect2 = left_hint_surface2.get_rect(
-                topleft=(dialogue_bg.left + inner_padding, left_hint_rect1.bottom + padding)
+                topleft=(dialogue_bg.left + inner_padding, left_hint_rect1.bottom + padding // 2)
             )
             surface.blit(left_hint_surface2, left_hint_rect2)
             

@@ -58,12 +58,13 @@ class Game:
                 "choices": [
                     {"text": "Tell me about this place", "next": "about_place"},
                     {"text": "I need information", "next": "information"},
-                    {"text": "Let's chat freely", "type": "ai_dialogue", "system_prompt": "You are a friendly villager named Villager in the town of Pixelburg. You've lived here your whole life and know all about the town, the nearby dungeons, and local legends. You speak in a folksy, casual manner. You can talk about the town, give advice on adventuring, or engage in casual conversation."}
+                    {"text": "Let's chat freely", "type": "ai_dialogue", "system_prompt": "You are a friendly villager named Villager in the town of Pixelburg. You've lived here your whole life and know all about the town, the nearby dungeons, and local legends. You speak in a folksy, casual manner. You can talk about the town, give advice on adventuring, or engage in casual conversation."},
+                    {"text": "Bye", "next": None}
                 ]
             },
             "about_place": {
                 "messages": ["This is the town of Pixelburg.", "We've lived here for generations.", "It's a peaceful place, except for the monsters outside."],
-                "next": "default"
+                "next": None
             },
             "information": {
                 "messages": ["What kind of information do you seek?", "I know many things about this area."],
@@ -79,7 +80,7 @@ class Game:
             },
             "dungeon": {
                 "messages": ["The dungeon to the north is dangerous.", "Many have entered, few have returned.", "They say a powerful artifact lies within."],
-                "next": "default"
+                "next": None
             }
         }
         
@@ -109,7 +110,7 @@ class Game:
             },
             "fascinated": {
                 "messages": ["Few show interest in the theoretical aspects of magic.", "Perhaps you have the mind of a mage.", "Feel free to visit my tower if you wish to learn more."],
-                "next": "default"
+                "next": None
             },
             "teach_magic": {
                 "messages": ["Teaching magic requires commitment and natural talent.", "Do you believe you possess these qualities?"],
