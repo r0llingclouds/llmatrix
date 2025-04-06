@@ -96,8 +96,6 @@ class Game:
         self.shop_menu.add.button('Buy', self.buy_item)
         self.shop_menu.add.button('Sell', self.sell_item)
         self.shop_menu.add.button('Exit', self.close_shop)
-        # Add a label for displaying messages (initially empty)
-        self.shop_message = self.shop_menu.add.label("", align=pygame_menu.locals.ALIGN_CENTER)
         
         # Set current menu
         self.current_menu = self.main_menu
@@ -121,8 +119,9 @@ class Game:
         return pygame_menu.events.RESET
     
     def buy_item(self):
-        """Display a static message when 'Buy' is clicked."""
-        self.shop_message.set_title("I have potions for you")
+        """Close the shop menu and show a dialogue message."""
+        self.close_shop()  # Close the shop menu
+        self.dialogue_system.show_dialogue("I have potions for you")
     
     def sell_item(self):
         """Placeholder for sell logic."""
@@ -138,8 +137,6 @@ class Game:
         """Open the shop menu."""
         self.state = "SHOPPING"
         self.current_menu = self.shop_menu
-        # Clear the shop message when opening the menu
-        self.shop_message.set_title("")
     
     def handle_events(self):
         """Handle all game events."""
@@ -160,11 +157,12 @@ class Game:
         # Handle gameplay events
         for event in events:
             if event.type == pygame.KEYDOWN:
-                # Toggle pause
+                # Toggle pause or exit dialogue
                 if event.key == pygame.K_ESCAPE:
                     if self.dialogue_system.active:
                         self.dialogue_system.close()
-                        if self.interacting_with:
+                        # Only reset conversation if interacting with an AINPC
+                        if self.interacting_with and isinstance(self.interacting_with, AINPC):
                             self.interacting_with.reset_conversation()
                         self.interacting_with = None
                     else:
