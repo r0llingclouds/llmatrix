@@ -1,5 +1,6 @@
 import pygame
 from constants import *
+from typing import Union, List
 
 class DialogueSystem:
     def __init__(self):
@@ -9,6 +10,8 @@ class DialogueSystem:
         self.response_mode = False
         self.final_response = False
         self.current_text = ""
+        self.messages = []  # Holds the sequence of messages
+        self.current_index = 0  # Tracks which message we’re on
         self.input_text = ""
         self.text_surface = None
         self.text_rect = None
@@ -16,12 +19,20 @@ class DialogueSystem:
         self.cursor_visible = True
         self.cursor_timer = 0
 
-    def show_dialogue(self, text: str, is_response=False, is_final=False):
+    def show_dialogue(self, messages: Union[str, List[str]], is_response=False, is_final=False):
+        """Show a dialogue, either a single message or a list of them."""
+        if isinstance(messages, str):
+            messages = [messages]  # Turn a single string into a list
+        self.messages = messages
+        self.current_index = 0
         self.active = True
-        self.current_text = text
+        self.input_mode = False  # No input needed for static dialogue
         self.response_mode = is_response
         self.final_response = is_final
-
+        if messages:
+            self.current_text = self.messages[0]  # Start with the first message
+        else:
+            self.current_text = ""
         self.text_rect = pygame.Rect(
             SCREEN_WIDTH // 8,
             SCREEN_HEIGHT - 200,
@@ -29,10 +40,17 @@ class DialogueSystem:
             100
         )
 
+    def next_message(self):
+        """Move to the next message or close if we’re done."""
+        if self.current_index < len(self.messages) - 1:
+            self.current_index += 1
+            self.current_text = self.messages[self.current_index]
+        else:
+            self.close()
+
     def start_input_mode(self):
+        """Switch to input mode for typing (not used in static dialogue)."""
         self.input_mode = True
-        self.response_mode = False
-        self.final_response = False
         self.input_text = ""
         self.input_rect = pygame.Rect(
             SCREEN_WIDTH // 4,
@@ -42,34 +60,42 @@ class DialogueSystem:
         )
 
     def add_character(self, char: str):
+        """Add a character to the input text."""
         if len(self.input_text) < INPUT_MAX_LENGTH:
             self.input_text += char
 
     def remove_character(self):
+        """Remove the last character from input text."""
         if self.input_text:
             self.input_text = self.input_text[:-1]
 
     def submit_input(self) -> str:
+        """Submit the input text and clear it."""
         text = self.input_text
         self.input_text = ""
         self.input_mode = False
         return text
 
     def close(self):
+        """Shut down the dialogue and reset everything."""
         self.active = False
         self.input_mode = False
         self.response_mode = False
         self.final_response = False
         self.current_text = ""
+        self.messages = []
+        self.current_index = 0
         self.input_text = ""
 
     def update(self):
+        """Update the cursor blink timer."""
         self.cursor_timer += 1
         if self.cursor_timer >= 30:
             self.cursor_visible = not self.cursor_visible
             self.cursor_timer = 0
 
     def draw(self, surface: pygame.Surface):
+        """Draw the dialogue box and text on the screen."""
         if not self.active:
             return
 
@@ -112,6 +138,7 @@ class DialogueSystem:
             surface.blit(input_text_surface, input_text_rect)
 
     def calculate_wrapped_lines(self, text, font, max_width):
+        """Wrap text into lines that fit the width."""
         words = text.split(' ')
         lines = []
         current_line = ""
@@ -129,6 +156,7 @@ class DialogueSystem:
         return lines
 
     def draw_text_lines(self, surface, lines, font, color, rect):
+        """Draw each line of text centered vertically."""
         total_height = len(lines) * font.get_height()
 
         if total_height > rect.height:

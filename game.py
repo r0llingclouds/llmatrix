@@ -101,54 +101,58 @@ class Game:
         self.current_menu = self.main_menu
     
     def _start_game(self):
-        """Start the game (called from menu)."""
+        """Start the game from the main menu."""
         self.state = "PLAYING"
         self.current_menu = None
         return pygame_menu.events.CLOSE
     
     def _resume_game(self):
-        """Resume the game from pause."""
+        """Resume from pause."""
         self.state = "PLAYING"
         self.current_menu = None
         return pygame_menu.events.CLOSE
     
     def _return_to_main(self):
-        """Return to main menu."""
+        """Go back to the main menu."""
         self.state = "MENU"
         self.current_menu = self.main_menu
         return pygame_menu.events.RESET
     
     def buy_item(self):
-        """Close the shop menu and show a dialogue message."""
-        self.close_shop()  # Close the shop menu
-        self.dialogue_system.show_dialogue("I have potions for you")
-    
+        """Close the shop and show a sequence of messages."""
+        self.close_shop()
+        self.dialogue_system.show_dialogue([
+            "I have potions for you!",
+            "They're quite handy in a pinch.",
+            "Would you like to buy one?",
+        ])
+
     def sell_item(self):
-        """Placeholder for sell logic."""
+        """Placeholder for selling shit."""
         print("Selling item...")
         self.close_shop()
-    
+
     def close_shop(self):
-        """Close the shop menu and return to the game."""
+        """Close the shop and get back to playing."""
         self.state = "PLAYING"
         self.current_menu = None
-    
+
     def open_shop(self):
         """Open the shop menu."""
         self.state = "SHOPPING"
         self.current_menu = self.shop_menu
-    
+
     def handle_events(self):
-        """Handle all game events."""
+        """Handle all the fucking events."""
         events = pygame.event.get()
         
-        # Check for quit event
+        # Quit the game
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
                 return
         
-        # Handle menus if active
+        # Handle menus
         if self.state in ["MENU", "PAUSED", "SHOPPING"]:
             if self.current_menu is not None:
                 self.current_menu.update(events)
@@ -157,48 +161,58 @@ class Game:
         # Handle gameplay events
         for event in events:
             if event.type == pygame.KEYDOWN:
-                # Toggle pause or exit dialogue
+                # Escape key: advance dialogue or pause
                 if event.key == pygame.K_ESCAPE:
                     if self.dialogue_system.active:
-                        self.dialogue_system.close()
-                        # Only reset conversation if interacting with an AINPC
-                        if self.interacting_with and isinstance(self.interacting_with, AINPC):
-                            self.interacting_with.reset_conversation()
-                        self.interacting_with = None
+                        self.dialogue_system.next_message()
+                        if not self.dialogue_system.active:
+                            if self.interacting_with and isinstance(self.interacting_with, AINPC):
+                                self.interacting_with.reset_conversation()
+                            self.interacting_with = None
                     else:
                         self.state = "PAUSED"
                         self.current_menu = self.pause_menu
                 
-                # Handle dialogue
-                elif self.dialogue_system.input_mode:
-                    if event.key == pygame.K_RETURN:
+                # Enter key: also advance dialogue
+                elif event.key == pygame.K_RETURN:
+                    if self.dialogue_system.active and not self.dialogue_system.input_mode:
+                        # For response mode dialogues, start input mode instead of advancing
+                        if self.dialogue_system.response_mode:
+                            self.dialogue_system.start_input_mode()
+                        # For regular dialogues, advance to next message
+                        else:
+                            self.dialogue_system.next_message()
+                            if not self.dialogue_system.active:
+                                if self.interacting_with and isinstance(self.interacting_with, AINPC):
+                                    self.interacting_with.reset_conversation()
+                                self.interacting_with = None
+                    # Dialogue input handling
+                    elif self.dialogue_system.input_mode:
                         player_input = self.dialogue_system.submit_input()
                         if self.interacting_with:
                             response = self.interacting_with.respond_to_input(player_input)
                             self.dialogue_system.show_dialogue(response)
                             self.dialogue_system.start_input_mode()
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.dialogue_system.remove_character()
-                    elif event.unicode and event.unicode.isprintable():
-                        self.dialogue_system.add_character(event.unicode)
-                
-                # Interaction
-                elif event.key == pygame.K_RETURN and self.interaction_cooldown <= 0:
-                    if self.dialogue_system.active:
-                        if self.dialogue_system.response_mode:
-                            self.dialogue_system.start_input_mode()
-                    else:
+                    # Interact with NPCs
+                    elif self.interaction_cooldown <= 0:
                         self.try_interaction()
-                    self.interaction_cooldown = 10
+                        self.interaction_cooldown = 10
                 
-                # Memory toggle
+                # Dialogue input handling - backspace
+                elif self.dialogue_system.input_mode and event.key == pygame.K_BACKSPACE:
+                    self.dialogue_system.remove_character()
+                # Add printable characters to input
+                elif self.dialogue_system.input_mode and event.unicode and event.unicode.isprintable():
+                    self.dialogue_system.add_character(event.unicode)
+                
+                # Toggle NPC memory
                 elif event.key == pygame.K_m:
                     if self.interacting_with and isinstance(self.interacting_with, AINPC):
                         memory_status = self.interacting_with.toggle_memory()
                         self.dialogue_system.show_dialogue(f"[System: {memory_status}]", is_response=True)
     
     def try_interaction(self):
-        """Try to interact with an NPC."""
+        """Try interacting with an NPC nearby."""
         interaction_range = pygame.Rect(
             self.player.rect.x - 20,
             self.player.rect.y - 20,
@@ -217,7 +231,7 @@ class Game:
                 break
     
     def update(self):
-        """Update game state."""
+        """Update the game state."""
         if self.state in ["MENU", "PAUSED", "SHOPPING"]:
             return
         if self.state == "PLAYING":
@@ -239,7 +253,7 @@ class Game:
                     self.player.move(dx, dy, self.walls)
     
     def draw(self):
-        """Draw everything to the screen."""
+        """Draw all the shit on the screen."""
         self.screen.fill(BLACK)
         if self.state != "MENU":
             for wall in self.walls:
@@ -253,7 +267,7 @@ class Game:
         pygame.display.flip()
     
     def run(self):
-        """Main game loop."""
+        """Run the main fucking game loop."""
         while self.running:
             self.handle_events()
             self.update()
