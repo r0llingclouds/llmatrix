@@ -139,13 +139,6 @@ class DialogueSystem:
             SCREEN_WIDTH * 3 // 4,  # Use 3/4 of screen width
             100  # Taller to fit wrapped text
         )
-        
-        if is_response:
-            instruction_text = "Press Enter to exit" if is_final else "Press Enter to continue"
-            self.instruction_surface = self.font.render(instruction_text, True, WHITE)
-            self.instruction_rect = self.instruction_surface.get_rect(
-                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 35)
-            )
     
     def start_input_mode(self):
         self.input_mode = True
@@ -225,9 +218,6 @@ class DialogueSystem:
         self.draw_text_lines(surface, lines, self.font, WHITE, 
                             pygame.Rect(dialogue_bg.left + padding, dialogue_bg.top + padding,
                                         dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
-        
-        if self.response_mode:
-            surface.blit(self.instruction_surface, self.instruction_rect)
         
         if self.input_mode:
             input_bg_surface = pygame.Surface((self.input_rect.width, self.input_rect.height), pygame.SRCALPHA)
