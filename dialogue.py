@@ -11,13 +11,21 @@ class DialogueSystem:
         self.final_response = False
         self.current_text = ""
         self.messages = []  # Holds the sequence of messages
-        self.current_index = 0  # Tracks which message we’re on
+        self.current_index = 0  # Tracks which message we're on
         self.input_text = ""
         self.text_surface = None
         self.text_rect = None
         self.input_rect = None
         self.cursor_visible = True
         self.cursor_timer = 0
+        
+        # New attributes for choice-based dialogue
+        self.has_choices = False
+        self.choices = []
+        self.selected_choice = 0
+        self.choice_rects = []
+        self.npc_name = None
+        self.npc_sprite = None
 
     def show_dialogue(self, messages: Union[str, List[str]], is_response=False, is_final=False):
         """Show a dialogue, either a single message or a list of them."""
@@ -39,14 +47,56 @@ class DialogueSystem:
             SCREEN_WIDTH * 3 // 4,
             100
         )
+        # Reset choices when showing new dialogue
+        self.has_choices = False
+        self.choices = []
+        self.selected_choice = 0
+        self.choice_rects = []
+
+    def show_dialogue_with_choices(self, messages: List[str], choices: List[dict] = None, 
+                                  npc_name: str = None, npc_sprite: pygame.Surface = None):
+        """Show dialogue with potential choices."""
+        self.show_dialogue(messages)
+        self.npc_name = npc_name
+        self.npc_sprite = npc_sprite
+        
+        if choices:
+            self.has_choices = True
+            self.choices = choices
+            self.selected_choice = 0
+            self.choice_rects = []
+        else:
+            self.has_choices = False
+            self.choices = []
 
     def next_message(self):
-        """Move to the next message or close if we’re done."""
+        """Move to the next message or close if we're done."""
         if self.current_index < len(self.messages) - 1:
             self.current_index += 1
             self.current_text = self.messages[self.current_index]
         else:
-            self.close()
+            if self.has_choices:
+                # Last message reached and choices are available
+                # Keep dialogue open for choice selection
+                pass
+            else:
+                self.close()
+
+    def select_next_choice(self):
+        """Move selection to the next choice."""
+        if self.has_choices and self.choices:
+            self.selected_choice = (self.selected_choice + 1) % len(self.choices)
+
+    def select_prev_choice(self):
+        """Move selection to the previous choice."""
+        if self.has_choices and self.choices:
+            self.selected_choice = (self.selected_choice - 1) % len(self.choices)
+
+    def get_selected_choice(self):
+        """Get the currently selected choice index."""
+        if self.has_choices and self.choices:
+            return self.selected_choice
+        return None
 
     def start_input_mode(self):
         """Switch to input mode for typing (not used in static dialogue)."""
@@ -106,6 +156,11 @@ class DialogueSystem:
 
         total_text_height = len(lines) * self.font.get_height()
         required_height = total_text_height + padding * 2
+        
+        # Add extra height for choices if needed
+        if self.has_choices and self.current_index == len(self.messages) - 1:
+            choice_height = len(self.choices) * (self.font.get_height() + 10)
+            required_height += choice_height + padding
 
         if required_height > self.text_rect.height:
             y_offset = required_height - self.text_rect.height
@@ -122,10 +177,26 @@ class DialogueSystem:
         bg_surface = pygame.Surface((dialogue_bg.width, dialogue_bg.height), pygame.SRCALPHA)
         bg_surface.fill(DIALOGUE_BG)
         surface.blit(bg_surface, (dialogue_bg.left, dialogue_bg.top))
+        
+        # Draw NPC name if available
+        if self.npc_name:
+            name_surface = self.font.render(self.npc_name, True, WHITE)
+            name_rect = name_surface.get_rect(topleft=(dialogue_bg.left + padding, dialogue_bg.top + padding))
+            surface.blit(name_surface, name_rect)
+            
+            # Adjust text area to account for name
+            text_top = name_rect.bottom + padding
+        else:
+            text_top = dialogue_bg.top + padding
 
+        # Draw the main dialogue text
         self.draw_text_lines(surface, lines, self.font, WHITE,
-                             pygame.Rect(dialogue_bg.left + padding, dialogue_bg.top + padding,
+                             pygame.Rect(dialogue_bg.left + padding, text_top,
                                          dialogue_bg.width - padding * 2, dialogue_bg.height - padding * 2))
+
+        # Draw choices if showing the last message and choices are available
+        if self.has_choices and self.current_index == len(self.messages) - 1:
+            self.draw_choices(surface, dialogue_bg, padding)
 
         if self.input_mode:
             input_bg_surface = pygame.Surface((self.input_rect.width, self.input_rect.height), pygame.SRCALPHA)
@@ -170,3 +241,24 @@ class DialogueSystem:
                 line_rect = line_surface.get_rect(midtop=(rect.centerx, y_pos))
                 surface.blit(line_surface, line_rect)
             y_pos += font.get_height()
+
+    def draw_choices(self, surface, dialogue_bg, padding):
+        """Draw the choice options."""
+        self.choice_rects = []
+        
+        # Start position for choices
+        choice_y = dialogue_bg.bottom - (len(self.choices) * (self.font.get_height() + 10)) - padding
+        
+        for i, choice in enumerate(self.choices):
+            choice_text = choice["text"]
+            choice_color = CHOICE_HIGHLIGHT if i == self.selected_choice else CHOICE_NORMAL
+            
+            choice_surface = self.font.render(f"> {choice_text}", True, choice_color)
+            choice_rect = choice_surface.get_rect(
+                topleft=(dialogue_bg.left + padding * 2, choice_y)
+            )
+            
+            surface.blit(choice_surface, choice_rect)
+            self.choice_rects.append(choice_rect)
+            
+            choice_y += self.font.get_height() + 5

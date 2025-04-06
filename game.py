@@ -2,7 +2,7 @@ import pygame
 import openai
 import os
 import pygame_menu
-from entities import Player, AINPC, Entity, ShopNPC
+from entities import Player, AINPC, Entity, ShopNPC, StaticNPC
 from dialogue import DialogueSystem
 from constants import *
 
@@ -50,6 +50,40 @@ class Game:
                      "Hello, how can I assist you today?")
             )
         self.npcs.append(ShopNPC(400, 400, GREEN))
+        
+        # Add a Static NPC with dialogue
+        villager_dialogue = {
+            "default": {
+                "messages": ["Hello there!", "I'm a local villager.", "How can I help you?"],
+                "choices": [
+                    {"text": "Tell me about this place", "next": "about_place"},
+                    {"text": "I need information", "next": "information"},
+                    {"text": "Goodbye", "next": None}
+                ]
+            },
+            "about_place": {
+                "messages": ["This is the town of Pixelburg.", "We've lived here for generations.", "It's a peaceful place, except for the monsters outside."],
+                "next": "default"
+            },
+            "information": {
+                "messages": ["What kind of information do you seek?", "I know many things about this area."],
+                "choices": [
+                    {"text": "Local rumors", "next": "rumors"},
+                    {"text": "The nearby dungeon", "next": "dungeon"},
+                    {"text": "Never mind", "next": "default"}
+                ]
+            },
+            "rumors": {
+                "messages": ["They say there's treasure hidden in the mountains.", "But no one has found it yet.", "Some believe it's just a myth."],
+                "next": "default"
+            },
+            "dungeon": {
+                "messages": ["The dungeon to the north is dangerous.", "Many have entered, few have returned.", "They say a powerful artifact lies within."],
+                "next": "default"
+            }
+        }
+        
+        self.npcs.append(StaticNPC(500, 200, PURPLE, villager_dialogue, name="Villager"))
         
         # Initialize dialogue system
         self.dialogue_system = DialogueSystem()
@@ -164,20 +198,46 @@ class Game:
                 # Escape key: advance dialogue or pause
                 if event.key == pygame.K_ESCAPE:
                     if self.dialogue_system.active:
-                        self.dialogue_system.next_message()
-                        if not self.dialogue_system.active:
-                            if self.interacting_with and isinstance(self.interacting_with, AINPC):
-                                self.interacting_with.reset_conversation()
+                        # If choices are displayed, escape closes the dialogue
+                        if self.dialogue_system.has_choices and self.dialogue_system.current_index == len(self.dialogue_system.messages) - 1:
+                            self.dialogue_system.close()
+                            if isinstance(self.interacting_with, StaticNPC):
+                                self.interacting_with.reset_dialogue()
                             self.interacting_with = None
+                        else:
+                            self.dialogue_system.next_message()
+                            if not self.dialogue_system.active:
+                                if self.interacting_with and isinstance(self.interacting_with, AINPC):
+                                    self.interacting_with.reset_conversation()
+                                elif isinstance(self.interacting_with, StaticNPC):
+                                    self.interacting_with.reset_dialogue()
+                                self.interacting_with = None
                     else:
                         self.state = "PAUSED"
                         self.current_menu = self.pause_menu
                 
-                # Enter key: also advance dialogue
+                # Enter key: also advance dialogue or select choice
                 elif event.key == pygame.K_RETURN:
                     if self.dialogue_system.active and not self.dialogue_system.input_mode:
+                        # If displaying choices and at last message, select the currently highlighted choice
+                        if self.dialogue_system.has_choices and self.dialogue_system.current_index == len(self.dialogue_system.messages) - 1:
+                            if isinstance(self.interacting_with, StaticNPC):
+                                choice_index = self.dialogue_system.get_selected_choice()
+                                messages, has_choices, choices = self.interacting_with.advance_dialogue(choice_index)
+                                
+                                if messages:
+                                    self.dialogue_system.show_dialogue_with_choices(
+                                        messages, 
+                                        choices if has_choices else None,
+                                        self.interacting_with.name,
+                                        self.interacting_with.sprite
+                                    )
+                                else:
+                                    # End dialogue if no more messages
+                                    self.dialogue_system.close()
+                                    self.interacting_with = None
                         # For response mode dialogues, start input mode instead of advancing
-                        if self.dialogue_system.response_mode:
+                        elif self.dialogue_system.response_mode:
                             self.dialogue_system.start_input_mode()
                         # For regular dialogues, advance to next message
                         else:
@@ -197,6 +257,13 @@ class Game:
                     elif self.interaction_cooldown <= 0:
                         self.try_interaction()
                         self.interaction_cooldown = 10
+                
+                # Navigate choices with arrow keys
+                elif self.dialogue_system.has_choices and self.dialogue_system.current_index == len(self.dialogue_system.messages) - 1:
+                    if event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.dialogue_system.select_next_choice()
+                    elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.dialogue_system.select_prev_choice()
                 
                 # Dialogue input handling - backspace
                 elif self.dialogue_system.input_mode and event.key == pygame.K_BACKSPACE:
@@ -222,8 +289,19 @@ class Game:
         for npc in self.npcs:
             if interaction_range.colliderect(npc.rect):
                 result = npc.interact()
+                
                 if result == "shop":
                     self.open_shop()
+                    self.interacting_with = npc
+                elif result == "static_dialogue" and isinstance(npc, StaticNPC):
+                    # Handle static NPC dialogue
+                    messages, has_choices, choices = npc.get_current_dialogue()
+                    self.dialogue_system.show_dialogue_with_choices(
+                        messages,
+                        choices if has_choices else None,
+                        npc.name,
+                        npc.sprite
+                    )
                     self.interacting_with = npc
                 elif isinstance(result, str):
                     self.dialogue_system.show_dialogue(result, is_response=True)
