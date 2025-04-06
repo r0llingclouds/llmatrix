@@ -23,6 +23,7 @@ BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 PURPLE = (160, 32, 240)
 ORANGE = (255, 165, 0)
+GRAY = (150, 150, 150)  # Medium gray for hints
 DIALOGUE_BG = (50, 50, 50, 200)
 INPUT_BG = (30, 30, 30, 220)
 CHOICE_HIGHLIGHT = (255, 255, 0)  # Yellow highlight for selected choices

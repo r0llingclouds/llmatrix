@@ -161,6 +161,10 @@ class DialogueSystem:
         if self.has_choices and self.current_index == len(self.messages) - 1:
             choice_height = len(self.choices) * (self.font.get_height() + 10)
             required_height += choice_height + padding
+        
+        # Add extra height for input area
+        if self.input_mode:
+            required_height += self.font.get_height() + padding * 2
 
         if required_height > self.text_rect.height:
             y_offset = required_height - self.text_rect.height
@@ -198,15 +202,43 @@ class DialogueSystem:
         if self.has_choices and self.current_index == len(self.messages) - 1:
             self.draw_choices(surface, dialogue_bg, padding)
 
+        # Draw input area if in input mode
         if self.input_mode:
+            input_y = dialogue_bg.bottom - self.font.get_height() - padding * 2
+            
+            if self.input_rect is None or self.input_rect.y != input_y:
+                self.input_rect = pygame.Rect(
+                    dialogue_bg.left + padding,
+                    input_y,
+                    dialogue_bg.width - padding * 2,
+                    self.font.get_height() + padding
+                )
+            
             input_bg_surface = pygame.Surface((self.input_rect.width, self.input_rect.height), pygame.SRCALPHA)
             input_bg_surface.fill(INPUT_BG)
             surface.blit(input_bg_surface, self.input_rect)
 
+            prompt_text = "> "
+            prompt_surface = self.font.render(prompt_text, True, WHITE)
+            prompt_rect = prompt_surface.get_rect(
+                topleft=(self.input_rect.left + 5, self.input_rect.top + padding // 2)
+            )
+            surface.blit(prompt_surface, prompt_rect)
+
             display_text = self.input_text + ("|" if self.cursor_visible else "")
             input_text_surface = self.font.render(display_text, True, WHITE)
-            input_text_rect = input_text_surface.get_rect(midleft=(self.input_rect.left + 10, self.input_rect.centery))
+            input_text_rect = input_text_surface.get_rect(
+                topleft=(prompt_rect.right, self.input_rect.top + padding // 2)
+            )
             surface.blit(input_text_surface, input_text_rect)
+            
+            # Draw hint for AI dialogue mode
+            hint_text = "Type 'exit' to end conversation"
+            hint_surface = self.font.render(hint_text, True, GRAY)
+            hint_rect = hint_surface.get_rect(
+                bottomright=(dialogue_bg.right - padding, dialogue_bg.bottom - padding // 2)
+            )
+            surface.blit(hint_surface, hint_rect)
 
     def calculate_wrapped_lines(self, text, font, max_width):
         """Wrap text into lines that fit the width."""

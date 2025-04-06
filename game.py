@@ -58,7 +58,7 @@ class Game:
                 "choices": [
                     {"text": "Tell me about this place", "next": "about_place"},
                     {"text": "I need information", "next": "information"},
-                    {"text": "Goodbye", "next": None} # this one seems to work ok
+                    {"text": "Let's chat freely", "type": "ai_dialogue", "system_prompt": "You are a friendly villager named Villager in the town of Pixelburg. You've lived here your whole life and know all about the town, the nearby dungeons, and local legends. You speak in a folksy, casual manner. You can talk about the town, give advice on adventuring, or engage in casual conversation."}
                 ]
             },
             "about_place": {
@@ -83,7 +83,52 @@ class Game:
             }
         }
         
-        self.npcs.append(StaticNPC(500, 200, PURPLE, villager_dialogue, name="Villager"))
+        villager_npc = StaticNPC(500, 200, PURPLE, villager_dialogue, name="Villager")
+        # Pass OpenAI client to StaticNPC for AI dialogue capability
+        if self.client:
+            villager_npc.set_openai_client(self.client)
+        self.npcs.append(villager_npc)
+        
+        # Add a Wizard NPC that demonstrates multiple AI dialogue pathways
+        wizard_dialogue = {
+            "default": {
+                "messages": ["*The wizard looks up from his scrolls*", "Greetings, traveler. I am Merlin, student of arcane mysteries."],
+                "choices": [
+                    {"text": "What are you studying?", "next": "studying"},
+                    {"text": "Can you teach me magic?", "next": "teach_magic"},
+                    {"text": "I need magical advice", "type": "ai_dialogue", "system_prompt": "You are Merlin, a wise but somewhat eccentric wizard. You know all sorts of magical lore, spells, and arcane mysteries. You speak with authority but also inject bits of humor. You're always willing to share magical knowledge, but you prefer not to give away powerful secrets to just anyone. You have a slight tendency to go off on tangents about magical theory."}
+                ]
+            },
+            "studying": {
+                "messages": ["Ancient texts from the forgotten era.", "I'm researching the connection between elemental forces and the mortal plane."],
+                "choices": [
+                    {"text": "Sounds fascinating", "next": "fascinated"},
+                    {"text": "Let me ask about something else", "next": "default"},
+                    {"text": "Tell me more about elemental forces", "type": "ai_dialogue", "system_prompt": "You are Merlin, an expert on elemental magic. You're currently researching the connection between elemental forces and the mortal plane. You can provide detailed information about the elements (fire, water, earth, air), their properties, and how they relate to spellcasting. You speak with passion about this subject and use specific magical terminology. You seem pleased that someone is interested in your research."}
+                ]
+            },
+            "fascinated": {
+                "messages": ["Few show interest in the theoretical aspects of magic.", "Perhaps you have the mind of a mage.", "Feel free to visit my tower if you wish to learn more."],
+                "next": "default"
+            },
+            "teach_magic": {
+                "messages": ["Teaching magic requires commitment and natural talent.", "Do you believe you possess these qualities?"],
+                "choices": [
+                    {"text": "Yes, I'm ready to learn", "next": "begin_teaching"},
+                    {"text": "Perhaps another time", "next": "default"},
+                    {"text": "Convince me you're a real wizard", "type": "ai_dialogue", "system_prompt": "You are Merlin, an experienced wizard teacher. Someone has just challenged you to prove you're a real wizard. You're slightly offended but also amused. Respond in character, explaining your magical credentials and perhaps describing some impressive feats you've performed. You might offer a small demonstration of your power through storytelling. You speak with confidence but not arrogance."}
+                ]
+            },
+            "begin_teaching": {
+                "messages": ["Very well.", "Magic begins with understanding your connection to the world around you.", "Start by observing the elements: fire, water, earth, and air.", "Meditation will help you sense their energies.", "Return when you've practiced this for a week."],
+                "next": "default"
+            }
+        }
+        
+        if self.client:
+            wizard_npc = StaticNPC(200, 350, ORANGE, wizard_dialogue, name="Merlin")
+            wizard_npc.set_openai_client(self.client)
+            self.npcs.append(wizard_npc)
         
         # Initialize dialogue system
         self.dialogue_system = DialogueSystem()
@@ -221,8 +266,12 @@ class Game:
                                     self.interacting_with.reset_dialogue()
                                     self.interacting_with = None
                             elif not self.dialogue_system.active:
-                                if self.interacting_with and isinstance(self.interacting_with, AINPC):
-                                    self.interacting_with.reset_conversation()
+                                if self.interacting_with:
+                                    if isinstance(self.interacting_with, AINPC):
+                                        self.interacting_with.reset_conversation()
+                                    # Handle StaticNPC in AI mode
+                                    elif isinstance(self.interacting_with, StaticNPC) and self.interacting_with.dialogue_mode == "ai":
+                                        self.interacting_with.end_ai_dialogue()
                                 self.interacting_with = None
                     else:
                         self.state = "PAUSED"
@@ -238,12 +287,19 @@ class Game:
                                 messages, has_choices, choices = self.interacting_with.advance_dialogue(choice_index)
                                 
                                 if messages:
+                                    # First display the messages
                                     self.dialogue_system.show_dialogue_with_choices(
                                         messages, 
                                         choices if has_choices else None,
                                         self.interacting_with.name,
                                         self.interacting_with.sprite
                                     )
+                                    
+                                    # Then check if we've transitioned to AI dialogue mode
+                                    if self.interacting_with.dialogue_mode == "ai":
+                                        # Set response mode and immediately start input mode
+                                        self.dialogue_system.response_mode = True
+                                        self.dialogue_system.start_input_mode()
                                 else:
                                     # End dialogue if no more messages
                                     self.dialogue_system.close()
@@ -270,16 +326,29 @@ class Game:
                                     self.interacting_with.reset_dialogue()
                                     self.interacting_with = None
                             elif not self.dialogue_system.active:
-                                if self.interacting_with and isinstance(self.interacting_with, AINPC):
-                                    self.interacting_with.reset_conversation()
+                                if self.interacting_with:
+                                    if isinstance(self.interacting_with, AINPC):
+                                        self.interacting_with.reset_conversation()
+                                    # Handle StaticNPC in AI mode
+                                    elif isinstance(self.interacting_with, StaticNPC) and self.interacting_with.dialogue_mode == "ai":
+                                        self.interacting_with.end_ai_dialogue()
                                 self.interacting_with = None
                     # Dialogue input handling
                     elif self.dialogue_system.input_mode:
                         player_input = self.dialogue_system.submit_input()
                         if self.interacting_with:
-                            response = self.interacting_with.respond_to_input(player_input)
-                            self.dialogue_system.show_dialogue(response)
-                            self.dialogue_system.start_input_mode()
+                            # Handle different types of NPCs
+                            if isinstance(self.interacting_with, AINPC):
+                                response = self.interacting_with.respond_to_input(player_input)
+                                self.dialogue_system.show_dialogue(response)
+                                self.dialogue_system.start_input_mode()
+                            # Handle StaticNPC in AI mode
+                            elif isinstance(self.interacting_with, StaticNPC) and self.interacting_with.dialogue_mode == "ai":
+                                response = self.interacting_with.respond_to_input(player_input)
+                                self.dialogue_system.show_dialogue(response)
+                                # If response ended AI mode, don't continue input mode
+                                if self.interacting_with.dialogue_mode == "ai":
+                                    self.dialogue_system.start_input_mode()
                     # Interact with NPCs
                     elif self.interaction_cooldown <= 0:
                         self.try_interaction()
@@ -330,6 +399,12 @@ class Game:
                         npc.sprite
                     )
                     self.interacting_with = npc
+                elif result == "ai_dialogue" and isinstance(npc, StaticNPC):
+                    # We're resuming an AI dialogue that was already in progress
+                    self.interacting_with = npc
+                    initial_message = "What would you like to talk about?"
+                    self.dialogue_system.show_dialogue(initial_message, is_response=True)
+                    self.dialogue_system.start_input_mode()
                 elif isinstance(result, str):
                     self.dialogue_system.show_dialogue(result, is_response=True)
                     self.interacting_with = npc

@@ -109,8 +109,23 @@ class StaticNPC(Entity):
         self.name = name or "NPC"
         self.sprite = sprite
         self.current_dialogue_key = "default"
+        # New attributes for AI dialogue support
+        self.dialogue_mode = "static"
+        self.ai_dialogue_instance = None
+        self.previous_dialogue_key = None
+        self.client = None
+    
+    def set_openai_client(self, client):
+        """Set the OpenAI client for AI dialogues"""
+        self.client = client
     
     def interact(self) -> str:
+        """Handle interaction with this NPC"""
+        # If already in AI dialogue mode, keep that state
+        if self.dialogue_mode == "ai":
+            # This tells the game we're in AI mode and should start with input
+            return "ai_dialogue"
+        # Otherwise, use normal static dialogue
         return "static_dialogue"
     
     def advance_dialogue(self, choice_index: int = None) -> tuple:
@@ -118,12 +133,27 @@ class StaticNPC(Entity):
         Advance dialogue based on player choice or to next dialogue sequence.
         Returns (messages, has_choices, choices)
         """
+        # If in AI mode, special handling required
+        if self.dialogue_mode == "ai":
+            return None, False, []
+            
         current = self.dialogue_data[self.current_dialogue_key]
         
         # If choice_index is provided and there are choices, follow that branch
         if choice_index is not None and "choices" in current:
             if 0 <= choice_index < len(current["choices"]):
-                next_key = current["choices"][choice_index]["next"]
+                choice = current["choices"][choice_index]
+                
+                # Check if this choice activates AI dialogue
+                if choice.get("type") == "ai_dialogue":
+                    if self.client:
+                        initial_response = self.start_ai_dialogue(choice.get("system_prompt", f"You are {self.name}, a character in a game."))
+                        return [initial_response], False, []
+                    else:
+                        # Fall back if no AI client available
+                        return ["Sorry, I can't chat freely right now."], False, []
+                
+                next_key = choice["next"]
                 if next_key is not None:
                     self.current_dialogue_key = next_key
                     return self.get_current_dialogue()
@@ -148,6 +178,75 @@ class StaticNPC(Entity):
         choices = current.get("choices", [])
         return messages, has_choices, choices
     
+    def start_ai_dialogue(self, system_prompt: str):
+        """Start AI dialogue mode"""
+        self.dialogue_mode = "ai"
+        self.previous_dialogue_key = self.current_dialogue_key
+        
+        # Create temporary AI dialogue handler
+        self.ai_dialogue_instance = {
+            "history": [
+                {"role": "system", "content": system_prompt},
+                {"role": "assistant", "content": "How can I help you?"}
+            ],
+            "memory_enabled": True
+        }
+        
+        # Return initial response for display
+        return self.ai_dialogue_instance["history"][1]["content"]
+    
+    def respond_to_input(self, player_input: str) -> str:
+        """Handle player input in AI dialogue mode"""
+        if self.dialogue_mode != "ai" or not self.ai_dialogue_instance or not self.client:
+            return "Sorry, I can't respond right now."
+            
+        # Check for exit commands
+        if player_input.lower() in ["goodbye", "bye", "exit", "quit", "leave"]:
+            response = "Goodbye then! Let me know if you need anything else."
+            self.end_ai_dialogue()
+            return response
+        
+        # Add user input to history
+        self.ai_dialogue_instance["history"].append({"role": "user", "content": player_input})
+        
+        try:
+            # Get AI response
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=self.ai_dialogue_instance["history"]
+            )
+            assistant_message = response.choices[0].message.content
+            
+            # Add response to history
+            self.ai_dialogue_instance["history"].append({"role": "assistant", "content": assistant_message})
+            
+            # Trim history if needed
+            self._trim_ai_history_if_needed()
+            
+            return assistant_message
+        except Exception as e:
+            print(f"AI Dialogue Error: {e}")
+            return "Sorry, I couldn't respond right now."
+    
+    def end_ai_dialogue(self):
+        """End AI dialogue mode and return to static dialogue"""
+        self.dialogue_mode = "static"
+        self.ai_dialogue_instance = None
+        # Optionally, change dialogue key based on game logic
+    
+    def _trim_ai_history_if_needed(self, max_messages=20):
+        """Trim AI dialogue history if it gets too long"""
+        if len(self.ai_dialogue_instance["history"]) > max_messages:
+            # Keep system message and trim the rest
+            system_message = self.ai_dialogue_instance["history"][0]
+            self.ai_dialogue_instance["history"] = [
+                system_message,
+                {"role": "system", "content": "Some conversation history has been summarized to save space."},
+                *self.ai_dialogue_instance["history"][-max_messages+2:]
+            ]
+    
     def reset_dialogue(self):
-        """Reset dialogue to default starting point."""
+        """Reset dialogue to default starting point and clear AI mode."""
         self.current_dialogue_key = "default"
+        self.dialogue_mode = "static"
+        self.ai_dialogue_instance = None
