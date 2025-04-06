@@ -135,7 +135,7 @@ class DialogueSystem:
         # Create a wider dialogue box that scales better with content
         self.text_rect = pygame.Rect(
             SCREEN_WIDTH // 8,  # Start from 1/8 of screen width (wider)
-            SCREEN_HEIGHT - 150,  # Position higher
+            SCREEN_HEIGHT - 200,  # Position higher (was -150)
             SCREEN_WIDTH * 3 // 4,  # Use 3/4 of screen width
             100  # Taller to fit wrapped text
         )
@@ -147,7 +147,7 @@ class DialogueSystem:
         self.input_text = ""
         self.input_rect = pygame.Rect(
             SCREEN_WIDTH // 4,
-            SCREEN_HEIGHT - 40,
+            SCREEN_HEIGHT - 85,  # Moved higher (was -35)
             SCREEN_WIDTH // 2,
             30
         )
