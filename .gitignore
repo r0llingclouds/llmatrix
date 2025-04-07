@@ -48,3 +48,6 @@ ENV/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Logs
+game.log
