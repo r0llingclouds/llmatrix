@@ -1,4 +1,6 @@
 import pygame
+import threading
+import logging
 from typing import Tuple, List
 from constants import *
 import openai
@@ -62,8 +64,28 @@ class AINPC(Entity):
             self.conversation_history.append({"role": "assistant", "content": assistant_message})
             return assistant_message
         except Exception as e:
-            print(f"API Error: {e}")
+            logging.error(f"API Error: {e}")
             return "Sorry, I couldn't respond right now."
+
+    def respond_to_input_async(self, player_input: str) -> None:
+        def api_call():
+            self.conversation_history.append({"role": "user", "content": player_input})
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=self.conversation_history
+                )
+                assistant_message = response.choices[0].message.content
+                self.conversation_history.append({"role": "assistant", "content": assistant_message})
+                self.trim_history_if_needed()
+                pygame.event.post(pygame.event.Event(RESPONSE_READY, {"message": assistant_message}))
+            except Exception as e:
+                logging.error(f"API Error: {e}")
+                error_message = "Sorry, I couldn't respond."
+                self.conversation_history.append({"role": "assistant", "content": error_message})
+                pygame.event.post(pygame.event.Event(RESPONSE_READY, {"message": error_message}))
+
+        threading.Thread(target=api_call).start()
 
     def is_conversation_complete(self) -> bool:
         return False
