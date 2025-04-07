@@ -48,7 +48,8 @@ class Game:
                 # Handle AI response readiness
                 if self.dialogue_system.state == DialogueState.WAITING_FOR_RESPONSE:
                     self.dialogue_system.show_dialogue(event.message)
-                    self.dialogue_system.state = DialogueState.SHOWING_DIALOGUE
+                    # Automatically transition to input mode instead of just showing dialogue
+                    self.dialogue_system.start_input_mode()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     # Close dialogue or quit game
@@ -70,10 +71,8 @@ class Game:
                     elif event.unicode and event.unicode.isprintable():
                         self.dialogue_system.add_character(event.unicode)
                 elif event.key == pygame.K_RETURN and self.interaction_cooldown <= 0:
-                    # Transition states or initiate interaction
-                    if self.dialogue_system.state == DialogueState.SHOWING_DIALOGUE:
-                        self.dialogue_system.start_input_mode()
-                    elif self.dialogue_system.state == DialogueState.INACTIVE:
+                    # Only use Enter to initiate interaction with NPCs
+                    if self.dialogue_system.state == DialogueState.INACTIVE:
                         self.try_interaction()
                     self.interaction_cooldown = INTERACTION_COOLDOWN
                 elif event.key == pygame.K_m:
@@ -95,7 +94,8 @@ class Game:
                 dialogue = npc.interact()
                 if dialogue:
                     self.dialogue_system.show_dialogue(dialogue)
-                    self.dialogue_system.state = DialogueState.SHOWING_DIALOGUE
+                    # Start input mode immediately after showing initial dialogue
+                    self.dialogue_system.start_input_mode()
                     self.interacting_with = npc
                 break
 

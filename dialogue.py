@@ -22,8 +22,7 @@ class DialogueSystem:
         self.cursor_timer = 0       # Timer for cursor blinking
 
     def show_dialogue(self, text: str) -> None:
-        """Display dialogue text and set the state to SHOWING_DIALOGUE."""
-        self.state = DialogueState.SHOWING_DIALOGUE
+        """Display dialogue text without changing state."""
         self.current_text = text
         self.text_rect = pygame.Rect(
             SCREEN_WIDTH // 8,
@@ -33,7 +32,7 @@ class DialogueSystem:
         )
 
     def start_input_mode(self) -> None:
-        """Switch to input mode and initialize the input box."""
+        """Switch to input mode and initialize the input box while keeping dialogue visible."""
         self.state = DialogueState.INPUT_MODE
         self.input_text = ""
         self.input_rect = pygame.Rect(
