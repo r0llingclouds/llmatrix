@@ -2,7 +2,7 @@
 
 **LLMatrix** is an experimental 2D role-playing game powered by AI language models. The game creates a unique experience where non-player characters (NPCs) can engage in dynamic, intelligent conversations through the OpenAI API.
 
-![LLMatrix Game](https://via.placeholder.com/800x450?text=LLMatrix+Screenshot)
+<img src="assets/logo.png" width="400" alt="LLMatrix Game" style="display: block; margin: 0 auto;">
 
 ## 🎮 Key Features
 
