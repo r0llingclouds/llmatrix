@@ -53,20 +53,6 @@ class AINPC(Entity):
     def interact(self) -> str:
         return self.conversation_history[1]["content"]
 
-    def respond_to_input(self, player_input: str) -> str:
-        self.conversation_history.append({"role": "user", "content": player_input})
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=self.conversation_history
-            )
-            assistant_message = response.choices[0].message.content
-            self.conversation_history.append({"role": "assistant", "content": assistant_message})
-            return assistant_message
-        except Exception as e:
-            logging.error(f"API Error: {e}")
-            return "Sorry, I couldn't respond right now."
-
     def respond_to_input_async(self, player_input: str) -> None:
         def api_call():
             self.conversation_history.append({"role": "user", "content": player_input})
