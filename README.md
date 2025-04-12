@@ -1,5 +1,10 @@
 # LLMATRIX - Simple 2D RPG with AI NPCs
 
+<p align="center">
+  <img src="resources/logo.png" alt="3D Test Logo" width="450"/>
+</p>
+
+
 **LLMATRIX** is a simple 2D role-playing game (RPG) built with Pygame, featuring interactive AI-powered non-player characters (NPCs) that leverage OpenAI's API for dynamic conversations. The game includes a player character, NPC interactions, a dialogue system, and basic collision detection with walls. This project serves as a foundation for exploring AI integration in game development.
 
 ## Features
